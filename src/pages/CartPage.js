@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { placeOrder } from '../services/api';
 import CartItem from '../components/CartItem';
 import styles from './CartPage.module.css';
+import { placeOrder } from '../services/firebaseApi';
 
-const CartPage = ({ cart, onUpdateQuantity, onRemove, onClearCart, getTotalPrice }) => {
+const CartPage = ({ cart = [], onUpdateQuantity, onClearCart }) => {
   const navigate = useNavigate();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+  // ✅ Calculate total here instead of relying on a prop that was never passed
+  const totalPrice = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
@@ -15,17 +21,13 @@ const CartPage = ({ cart, onUpdateQuantity, onRemove, onClearCart, getTotalPrice
     try {
       const result = await placeOrder(cart);
       onClearCart();
-      navigate('/token', { state: { token: result.token } });
+      navigate('/token', { state: { token: result.token, orderId: result.orderId } });
     } catch (error) {
-      console.error('Error placing order:', error);
-
-      if (error.code === 'INSUFFICIENT_STOCK' && Array.isArray(error.details)) {
-        const message = error.details
-          .map(item => `${item.name}: requested ${item.requested}, available ${item.available}`)
-          .join('\n');
-        alert(`Some items are out of stock or have limited stock:\n${message}`);
+      console.error('ORDER ERROR:', error);
+      if (error.code === 'permission-denied') {
+        alert('Firebase permission issue. Check Firestore rules.');
       } else {
-        alert('Failed to place order. Please try again.');
+        alert(error.message || 'Failed to place order');
       }
     } finally {
       setIsPlacingOrder(false);
@@ -40,7 +42,7 @@ const CartPage = ({ cart, onUpdateQuantity, onRemove, onClearCart, getTotalPrice
             <h2>Your cart is empty</h2>
             <p>Start shopping and add some items to your cart!</p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/store')}  // ✅ /store not /
               className={styles.browseButton}
             >
               Browse Store
@@ -68,7 +70,6 @@ const CartPage = ({ cart, onUpdateQuantity, onRemove, onClearCart, getTotalPrice
                 key={item.id}
                 item={item}
                 onUpdateQuantity={onUpdateQuantity}
-                onRemove={onRemove}
               />
             ))}
           </div>
@@ -78,16 +79,15 @@ const CartPage = ({ cart, onUpdateQuantity, onRemove, onClearCart, getTotalPrice
 
             <div className={styles.summaryRow}>
               <span>Subtotal</span>
-              <span>Rs {getTotalPrice().toFixed(2)}</span>
+              <span>Rs {totalPrice.toFixed(2)}</span>
             </div>
             <div className={styles.summaryRow}>
               <span>Service Fee</span>
               <span>Rs 0.00</span>
             </div>
-
             <div className={styles.summaryTotal}>
               <span>Total</span>
-              <span>Rs {getTotalPrice().toFixed(2)}</span>
+              <span>Rs {totalPrice.toFixed(2)}</span>
             </div>
 
             <button
@@ -99,7 +99,7 @@ const CartPage = ({ cart, onUpdateQuantity, onRemove, onClearCart, getTotalPrice
             </button>
 
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/store')}  // ✅ /store not /
               className={styles.continueButton}
             >
               Continue Shopping

@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './CartItem.module.css';
 
-const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
+const CartItem = ({ item, onUpdateQuantity }) => {
   const maxReached = item.quantity >= (Number(item.stock) || 0);
 
   return (
@@ -36,8 +36,9 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
             +
           </button>
 
+          {/* ✅ Remove by setting quantity to 0 — matches App.jsx handleUpdateQuantity logic */}
           <button
-            onClick={() => onRemove(item.id)}
+            onClick={() => onUpdateQuantity(item.id, 0)}
             className={styles.removeButton}
           >
             Remove

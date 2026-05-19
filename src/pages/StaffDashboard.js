@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getOrders, markOrderServed } from '../services/api';
+import { listenToOrders, markOrderServed, markOrderExpired } from '../services/firebaseApi';
 import OrderTable from '../components/OrderTable';
 import styles from './StaffDashboard.module.css';
+
+const EXPIRY_MS = 10 * 60 * 1000; // 20 minutes in milliseconds
 
 const StaffDashboard = () => {
   const [orders, setOrders] = useState([]);
@@ -9,36 +11,43 @@ const StaffDashboard = () => {
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    loadOrders();
-    const interval = setInterval(loadOrders, 3000);
-    return () => clearInterval(interval);
+    const unsubscribe = listenToOrders(async (data) => {
+      // Auto-expire any pending orders older than 20 minutes
+      const now = Date.now();
+      for (const order of data) {
+        if (order.status === 'pending') {
+          const createdAt = order.createdAt?.toDate?.() ?? new Date(order.createdAt ?? 0);
+          if (now - createdAt.getTime() > EXPIRY_MS) {
+            try {
+              await markOrderExpired(order.id);
+            } catch (err) {
+              console.error('Failed to expire order:', order.id, err);
+            }
+          }
+        }
+      }
+
+      const sortedOrders = [...data].sort((a, b) => {
+        // Handle Firestore Timestamps (.toDate()) and plain dates safely
+        const dateA = a.createdAt?.toDate?.() ?? new Date(a.createdAt ?? 0);
+        const dateB = b.createdAt?.toDate?.() ?? new Date(b.createdAt ?? 0);
+        return dateB - dateA;
+      });
+
+      setOrders(sortedOrders);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const loadOrders = async () => {
+  const handleMarkServed = async (orderId) => {
+    // orderId is the Firestore doc id, not the token string
     try {
-      const data = await getOrders();
-      const sortedOrders = data.sort((a, b) =>
-        new Date(b.timestamp) - new Date(a.timestamp)
-      );
-      setOrders(sortedOrders);
-    } catch (error) {
-      console.error('Error loading orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkServed = async (token) => {
-    try {
-      await markOrderServed(token);
-      await loadOrders();
+      await markOrderServed(orderId);
     } catch (error) {
       console.error('Error marking order as served:', error);
-      if (error.code === 'ORDER_NOT_SERVABLE') {
-        alert(`Order cannot be marked served because it is ${error.status}.`);
-      } else {
-        alert('Failed to update order status');
-      }
+      alert('Failed to update order status');
     }
   };
 
@@ -54,11 +63,15 @@ const StaffDashboard = () => {
   const servedCount = orders.filter(o => o.status === 'served').length;
   const cancelledCount = orders.filter(o => o.status === 'cancelled').length;
   const expiredCount = orders.filter(o => o.status === 'expired').length;
+
+  // Revenue only counts orders that are NOT cancelled or expired
+  // i.e. revenue is counted when order is placed (pending or served)
   const totalRevenue = orders
     .filter(order => order.status !== 'cancelled' && order.status !== 'expired')
     .reduce((sum, order) => {
-      const orderTotal = order.items.reduce((itemSum, item) =>
-        itemSum + (item.price * item.quantity), 0
+      const orderTotal = (order.items ?? []).reduce(
+        (itemSum, item) => itemSum + (item.price * item.quantity),
+        0
       );
       return sum + orderTotal;
     }, 0);
