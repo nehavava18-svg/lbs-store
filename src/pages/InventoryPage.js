@@ -1,352 +1,267 @@
-import React, { useState, useEffect } from 'react';
-import { getInventory, updateInventoryItem, addInventoryItem, deleteInventoryItem } from '../services/api';
-import styles from './InventoryPage.module.css';
+import React, { useEffect, useState } from "react";
+import {
+  getItems,
+  addInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem
+} from "../services/firebaseApi";
+import styles from "./InventoryPage.module.css";
+
+// ── Snacks ──────────────────────────────────────────────────────────────────
+// ── Stationery & Print ───────────────────────────────────────────────────────
+const PRESET_IMAGES = [
+  // SNACKS
+  { label: "Veg Puff",        url: "https://images.unsplash.com/photo-1604908177522-0408f8f8e8f4?w=400&h=400&fit=crop" },
+  { label: "Chicken Roll",    url: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=400&h=400&fit=crop" },
+  { label: "Samosa",          url: "https://images.unsplash.com/photo-1601050690117-6a8f9c6a2d7d?w=400&h=400&fit=crop" },
+  { label: "Masala Maggi",    url: "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400&h=400&fit=crop" },
+  { label: "Veg Sandwich",    url: "https://images.unsplash.com/photo-1553909489-cd47e0ef937f?w=400&h=400&fit=crop" },
+  { label: "Cold Coffee",     url: "https://images.unsplash.com/photo-1529892485617-25f63cd7b1e9?w=400&h=400&fit=crop" },
+  { label: "Lime Juice",      url: "https://images.unsplash.com/photo-1621263764928-df1444c5e859?w=400&h=400&fit=crop" },
+  { label: "Brownie",         url: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400&h=400&fit=crop" },
+  { label: "Tea",             url: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=400&h=400&fit=crop" },
+  { label: "Burger",          url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=400&fit=crop" },
+  { label: "Pizza Slice",     url: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=400&fit=crop" },
+  { label: "Chips / Crisps",  url: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&h=400&fit=crop" },
+  { label: "Water Bottle",    url: "https://images.unsplash.com/photo-1559839734-2b71ea197ec6?w=400&h=400&fit=crop" },
+  { label: "Fruit Juice",     url: "https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&h=400&fit=crop" },
+  { label: "Cookies",         url: "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400&h=400&fit=crop" },
+  { label: "Instant Noodles", url: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=400&fit=crop" },
+  // STATIONERY
+  { label: "Notebook",        url: "https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400&h=400&fit=crop" },
+  { label: "Pen / Pencil",    url: "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&h=400&fit=crop" },
+  { label: "Highlighters",    url: "https://images.unsplash.com/photo-1617957718587-59b41f4fa699?w=400&h=400&fit=crop" },
+  { label: "Sticky Notes",    url: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=400&h=400&fit=crop" },
+  { label: "Stapler",         url: "https://images.unsplash.com/photo-1604231800732-c4b4d2cb1567?w=400&h=400&fit=crop" },
+  { label: "Scissors",        url: "https://images.unsplash.com/photo-1603513492128-ba7bc9b3e143?w=400&h=400&fit=crop" },
+  { label: "Eraser",          url: "https://images.unsplash.com/photo-1577741314755-048d8525d31e?w=400&h=400&fit=crop" },
+  { label: "Ruler",           url: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=400&fit=crop" },
+  // PRINT
+  { label: "Printed Pages",   url: "https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=400&h=400&fit=crop" },
+  { label: "Spiral Binding",  url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=400&fit=crop" },
+  { label: "Lamination",      url: "https://images.unsplash.com/photo-1612198188060-c7c2a3b66eae?w=400&h=400&fit=crop" },
+  { label: "Colour Print",    url: "https://images.unsplash.com/photo-1562564055-71e051d33c19?w=400&h=400&fit=crop" },
+];
+
+const CATEGORIES = ["All", "Snacks", "Stationery", "Print"];
+
+const CATEGORY_RANGES = {
+  Snacks:     [0, 16],
+  Stationery: [16, 24],
+  Print:      [24, 28],
+};
+
+const EMPTY_FORM = { name: "", price: "", stock: "", image: "", category: "Snacks" };
 
 const InventoryPage = () => {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editingItem, setEditingItem] = useState(null);
-  const [editStock, setEditStock] = useState('');
-  const [editPrice, setEditPrice] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [deletingItemId, setDeletingItemId] = useState(null);
-  const [newItem, setNewItem] = useState({
-    name: '',
-    price: '',
-    stock: '',
-    image: ''
-  });
+  const [items, setItems]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [form, setForm]           = useState(EMPTY_FORM);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerCat, setPickerCat] = useState("Snacks");
 
-  useEffect(() => {
-    loadInventory();
-  }, []);
-
-  const loadInventory = async () => {
-    setLoading(true);
+  const loadItems = async () => {
     try {
-      const data = await getInventory();
-      setItems(data);
-    } catch (error) {
-      console.error('Error loading inventory:', error);
+      setLoading(true);
+      const data = await getItems();
+      setItems(data || []);
+    } catch (err) {
+      console.log("Error loading items:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditClick = (item) => {
-    setEditingItem(item.id);
-    setEditStock(item.stock.toString());
-    setEditPrice(item.price.toString());
-  };
+  useEffect(() => { loadItems(); }, []);
 
-  const handleSaveItem = async (item) => {
-    const stock = parseInt(editStock, 10);
-    const price = parseFloat(editPrice);
-
-    if (isNaN(stock) || stock < 0) {
-      alert('Please enter a valid stock number');
+  const handleAdd = async () => {
+    if (!form.name || !form.price || !form.stock) {
+      alert("Fill in name, price and stock");
       return;
     }
-
-    if (isNaN(price) || price <= 0) {
-      alert('Please enter a valid price');
-      return;
-    }
-
-    try {
-      await updateInventoryItem(item.id, { stock, price });
-      await loadInventory();
-      setEditingItem(null);
-    } catch (error) {
-      console.error('Error updating item:', error);
-      alert('Failed to update item');
-    }
-  };
-
-  const handleToggleStock = async (item) => {
-    try {
-      await updateInventoryItem(item.id, {
-        stock: item.inStock ? 0 : Math.max(item.stock, 1)
-      });
-      await loadInventory();
-    } catch (error) {
-      console.error('Error toggling stock:', error);
-      alert('Failed to toggle stock status');
-    }
-  };
-
-  const handleAddItem = async (event) => {
-    event.preventDefault();
-
-    const stock = parseInt(newItem.stock, 10);
-    const price = parseFloat(newItem.price);
-
-    if (!newItem.name.trim()) {
-      alert('Please enter an item name');
-      return;
-    }
-
-    if (isNaN(price) || price <= 0) {
-      alert('Please enter a valid price');
-      return;
-    }
-
-    if (isNaN(stock) || stock < 0) {
-      alert('Please enter a valid stock number');
-      return;
-    }
-
+    const stockNum = Number(form.stock);
     try {
       await addInventoryItem({
-        name: newItem.name,
-        price,
-        stock,
-        image: newItem.image
+        name: form.name,
+        price: Number(form.price),
+        stock: stockNum,
+        inStock: stockNum > 0,
+        image: form.image || "",
+        category: form.category,
+        deleted: false
       });
-      setNewItem({ name: '', price: '', stock: '', image: '' });
-      await loadInventory();
-    } catch (error) {
-      console.error('Error adding item:', error);
-      alert('Failed to add item');
+      setForm(EMPTY_FORM);
+      setShowPicker(false);
+      loadItems();
+    } catch (err) {
+      console.log(err);
+      alert("Failed to add item");
     }
   };
 
-  const handleDeleteItem = async (item) => {
-    const confirmed = window.confirm(`Delete "${item.name}"? This cannot be undone.`);
-    if (!confirmed) {
-      return;
-    }
-
-    setDeletingItemId(item.id);
+  const handleUpdateStock = async (id, newStock) => {
+    const stockNum = Number(newStock);
     try {
-      await deleteInventoryItem(item.id);
-      await loadInventory();
-      alert(`${item.name} deleted successfully.`);
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      alert('Failed to delete item');
-    } finally {
-      setDeletingItemId(null);
+      await updateInventoryItem(id, { stock: stockNum, inStock: stockNum > 0 });
+      loadItems();
+    } catch (err) {
+      console.log(err);
     }
   };
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this item?")) return;
+    try {
+      await deleteInventoryItem(id);
+      loadItems();
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
-  const inStockCount = items.filter(i => i.inStock).length;
-  const outOfStockCount = items.filter(i => !i.inStock).length;
-  const totalItems = items.reduce((sum, item) => sum + item.stock, 0);
-  const lowStockCount = items.filter(i => i.stock > 0 && i.stock < 10).length;
+  const visiblePresets = pickerCat === "All"
+    ? PRESET_IMAGES
+    : PRESET_IMAGES.slice(...CATEGORY_RANGES[pickerCat]);
 
   return (
     <div className={styles.page}>
       <div className={styles.container}>
-        <div className={styles.header}>
+
+        <div className={styles.hero}>
           <h1>Inventory Management</h1>
-          <p>Manage stock levels, pricing, and item availability</p>
+          <p>Add and manage store items</p>
         </div>
 
-        <form onSubmit={handleAddItem} className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ marginBottom: '1rem' }}>Add New Item</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 2fr auto', gap: '0.75rem' }}>
-            <input
-              type="text"
-              placeholder="Item name"
-              value={newItem.name}
-              onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
-              className="input"
-              required
-            />
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              placeholder="Price"
-              value={newItem.price}
-              onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
-              className="input"
-              required
-            />
-            <input
-              type="number"
-              min="0"
-              placeholder="Stock"
-              value={newItem.stock}
-              onChange={(e) => setNewItem(prev => ({ ...prev, stock: e.target.value }))}
-              className="input"
-              required
-            />
-            <input
-              type="url"
-              placeholder="Image URL (optional)"
-              value={newItem.image}
-              onChange={(e) => setNewItem(prev => ({ ...prev, image: e.target.value }))}
-              className="input"
-            />
-            <button type="submit" className="btn btn-primary">Add Item</button>
-          </div>
-        </form>
+        {/* ── ADD FORM ── */}
+        <div className={styles.formCard}>
+          <h2 className={styles.formTitle}>Add New Item</h2>
 
-        <div className={styles.stats}>
-          <div className={styles.statCard}>
-            <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Total Items</span>
-              <div className={styles.statIcon} />
+          <div className={styles.formBody}>
+            {/* Image picker trigger */}
+            <div
+              className={styles.imagePicker}
+              onClick={() => setShowPicker(!showPicker)}
+              title="Pick an image"
+            >
+              {form.image ? (
+                <img src={form.image} alt="preview" className={styles.imagePickerImg} />
+              ) : (
+                <div className={styles.imagePickerPlaceholder}>
+                  <span>📷</span>
+                  <span>Pick photo</span>
+                </div>
+              )}
             </div>
-            <div className={styles.statValue}>{totalItems}</div>
-            <div className={styles.statDescription}>units in stock</div>
-          </div>
 
-          <div className={styles.statCard}>
-            <div className={styles.statHeader}>
-              <span className={styles.statLabel}>In Stock</span>
-              <div className={styles.statIcon} />
+            <div className={styles.formFields}>
+              <div className={styles.formGrid}>
+                <input
+                  className={styles.input}
+                  placeholder="Item name *"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+                <input
+                  className={styles.input}
+                  placeholder="Price (Rs) *"
+                  type="number"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+                <input
+                  className={styles.input}
+                  placeholder="Stock *"
+                  type="number"
+                  value={form.stock}
+                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                />
+                <select
+                  className={styles.input}
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  <option>Snacks</option>
+                  <option>Stationery</option>
+                  <option>Print</option>
+                </select>
+              </div>
+              <button className={styles.addButton} onClick={handleAdd}>
+                + Add Item
+              </button>
             </div>
-            <div className={styles.statValue}>{inStockCount}</div>
-            <div className={styles.statDescription}>items available</div>
           </div>
 
-          <div className={styles.statCard}>
-            <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Out of Stock</span>
-              <div className={styles.statIcon} />
-            </div>
-            <div className={styles.statValue}>{outOfStockCount}</div>
-            <div className={styles.statDescription}>items unavailable</div>
-          </div>
-
-          <div className={styles.statCard}>
-            <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Low Stock</span>
-              <div className={styles.statIcon} />
-            </div>
-            <div className={styles.statValue}>{lowStockCount}</div>
-            <div className={styles.statDescription}>items &lt; 10 units</div>
-          </div>
-        </div>
-
-        <div className={styles.searchBar}>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search items..."
-            className={styles.searchInput}
-          />
-        </div>
-
-        {loading ? (
-          <div className="loading-spinner"></div>
-        ) : (
-          <div className={styles.inventoryTable}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Price</th>
-                  <th>Stock</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className={styles.itemInfo}>
-                        <img src={item.image} alt={item.name} className={styles.itemImage} />
-                        <span className={styles.itemName}>{item.name}</span>
-                      </div>
-                    </td>
-                    <td>
-                      {editingItem === item.id ? (
-                        <input
-                          type="number"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(e.target.value)}
-                          className={styles.stockInput}
-                          min="0.01"
-                          step="0.01"
-                        />
-                      ) : (
-                        <>Rs {item.price.toFixed(2)}</>
-                      )}
-                    </td>
-                    <td>
-                      {editingItem === item.id ? (
-                        <div className={styles.stockControls}>
-                          <input
-                            type="number"
-                            value={editStock}
-                            onChange={(e) => setEditStock(e.target.value)}
-                            className={styles.stockInput}
-                            min="0"
-                          />
-                          <button
-                            onClick={() => handleSaveItem(item)}
-                            className={`${styles.iconButton} ${styles.save}`}
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingItem(null)}
-                            className={`${styles.iconButton} ${styles.cancel}`}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className={styles.stockControls}>
-                          <span className={`${styles.stockDisplay} ${
-                            item.stock === 0 ? styles.out : item.stock < 10 ? styles.low : ''
-                          }`}>
-                            {item.stock} units
-                          </span>
-                          <button
-                            onClick={() => handleEditClick(item)}
-                            className={`${styles.iconButton} ${styles.edit}`}
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`badge ${item.inStock ? 'badge-success' : 'badge-danger'}`}>
-                        {item.inStock ? 'Available' : 'Unavailable'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => handleToggleStock(item)}
-                          className={styles.toggleButton}
-                          style={{
-                            background: item.inStock ? 'var(--color-danger)' : 'var(--color-success)',
-                            color: 'white'
-                          }}
-                        >
-                          {item.inStock ? 'Disable' : 'Enable'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item)}
-                          className={styles.toggleButton}
-                          disabled={deletingItemId === item.id}
-                          style={{
-                            background: '#7f1d1d',
-                            color: 'white',
-                            opacity: deletingItemId === item.id ? 0.7 : 1
-                          }}
-                        >
-                          {deletingItemId === item.id ? 'Deleting...' : 'Delete'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+          {/* Preset picker */}
+          {showPicker && (
+            <div className={styles.pickerPanel}>
+              <div className={styles.pickerTabs}>
+                {["All", "Snacks", "Stationery", "Print"].map(cat => (
+                  <button
+                    key={cat}
+                    className={`${styles.pickerTab} ${pickerCat === cat ? styles.pickerTabActive : ''}`}
+                    onClick={() => setPickerCat(cat)}
+                  >
+                    {cat}
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className={styles.presetGrid}>
+                {visiblePresets.map((img) => (
+                  <div
+                    key={img.url}
+                    className={`${styles.presetItem} ${form.image === img.url ? styles.presetSelected : ''}`}
+                    onClick={() => { setForm({ ...form, image: img.url }); setShowPicker(false); }}
+                  >
+                    <img src={img.url} alt={img.label} className={styles.presetImg} />
+                    <span className={styles.presetLabel}>{img.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── ITEM GRID ── */}
+        {loading ? (
+          <p className={styles.message}>Loading inventory...</p>
+        ) : items.length === 0 ? (
+          <p className={styles.message}>No items yet. Add one above.</p>
+        ) : (
+          <div className={styles.grid}>
+            {items.map((item) => (
+              <div key={item.id} className={styles.card}>
+                <div className={styles.imageContainer}>
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} className={styles.image} />
+                  ) : (
+                    <div className={styles.imageFallback}>No Image</div>
+                  )}
+                  <span className={`badge ${item.inStock ? 'badge-success' : 'badge-danger'} ${styles.badge}`}>
+                    {item.inStock ? 'In Stock' : 'Out of Stock'}
+                  </span>
+                </div>
+
+                <div className={styles.content}>
+                  <h3 className={styles.name}>{item.name}</h3>
+                  <p className={styles.price}>Rs {Number(item.price).toFixed(2)}</p>
+
+                  <div className={styles.stockRow}>
+                    <span className={styles.stockLabel}>Stock</span>
+                    <input
+                      type="number"
+                      className={styles.stockInput}
+                      defaultValue={item.stock}
+                      min="0"
+                      onBlur={(e) => handleUpdateStock(item.id, e.target.value)}
+                    />
+                  </div>
+
+                  <button className={styles.deleteButton} onClick={() => handleDelete(item.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

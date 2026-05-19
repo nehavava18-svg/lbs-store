@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrentToken, getOrders, cancelOrder } from '../services/api';
+import { getCurrentToken, getOrders, cancelOrder } from '../services/firebaseApi';
 import TokenDisplay from '../components/TokenDisplay';
 import styles from './StatusPage.module.css';
 

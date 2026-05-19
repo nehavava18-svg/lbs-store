@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getItems } from '../services/api';
+import { getItems } from '../services/firebaseApi';
 import ItemCard from '../components/ItemCard';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import styles from './StorePage.module.css';
 
-const StorePage = ({ cart, onAddToCart }) => {
+// ✅ Default cart to [] so cart.find() never crashes if prop is missing
+const StorePage = ({ cart = [], onAddToCart }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,6 +54,11 @@ const StorePage = ({ cart, onAddToCart }) => {
 
         {loading ? (
           <LoadingSkeleton type="card" count={8} />
+        ) : visibleItems.length === 0 ? (
+          // ✅ Show a message instead of blank screen when no items exist
+          <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginTop: '2rem' }}>
+            No items available right now.
+          </p>
         ) : (
           <div className={styles.grid}>
             {visibleItems.map(item => {

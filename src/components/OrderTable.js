@@ -15,6 +15,13 @@ const getStatusLabel = (status) => {
   return 'Cancelled';
 };
 
+// ✅ Safely convert Firestore Timestamp or string/number to a Date
+const toDate = (value) => {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate(); // Firestore Timestamp
+  return new Date(value); // fallback
+};
+
 const OrderTable = ({ orders, onMarkServed }) => {
   if (orders.length === 0) {
     return (
@@ -41,42 +48,49 @@ const OrderTable = ({ orders, onMarkServed }) => {
           </tr>
         </thead>
         <tbody>
-          {orders.map((order, index) => (
-            <tr key={index}>
-              <td>
-                <span className={styles.tokenCell}>{order.token}</span>
-              </td>
-              <td>
-                <ul className={styles.itemsList}>
-                  {order.items.map((item, idx) => (
-                    <li key={idx}>{item.name} x {item.quantity}</li>
-                  ))}
-                </ul>
-              </td>
-              <td>{new Date(order.timestamp).toLocaleTimeString()}</td>
-              <td>
-                <span className={`badge ${getBadgeClass(order.status)}`}>
-                  {getStatusLabel(order.status)}
-                </span>
-              </td>
-              <td>
-                {order.status === 'pending' ? (
-                  <button
-                    onClick={() => onMarkServed(order.token)}
-                    className={styles.actionButton}
-                  >
-                    Mark Served
-                  </button>
-                ) : order.status === 'expired' ? (
-                  <span className={styles.completedText}>Expired</span>
-                ) : order.status === 'cancelled' ? (
-                  <span className={styles.completedText}>Cancelled</span>
-                ) : (
-                  <span className={styles.completedText}>Completed</span>
-                )}
-              </td>
-            </tr>
-          ))}
+          {orders.map((order) => {
+            const date = toDate(order.createdAt);
+
+            return (
+              <tr key={order.id}>
+                <td>
+                  <span className={styles.tokenCell}>{order.token}</span>
+                </td>
+                <td>
+                  <ul className={styles.itemsList}>
+                    {(order.items ?? []).map((item, idx) => (
+                      <li key={idx}>{item.name} x {item.quantity}</li>
+                    ))}
+                  </ul>
+                </td>
+                <td>
+                  {/* ✅ Use createdAt (Firestore Timestamp), not timestamp */}
+                  {date ? date.toLocaleTimeString() : '—'}
+                </td>
+                <td>
+                  <span className={`badge ${getBadgeClass(order.status)}`}>
+                    {getStatusLabel(order.status)}
+                  </span>
+                </td>
+                <td>
+                  {order.status === 'pending' ? (
+                    <button
+                      onClick={() => onMarkServed(order.id)}  // ✅ pass doc id, not token
+                      className={styles.actionButton}
+                    >
+                      Mark Served
+                    </button>
+                  ) : order.status === 'expired' ? (
+                    <span className={styles.completedText}>Expired</span>
+                  ) : order.status === 'cancelled' ? (
+                    <span className={styles.completedText}>Cancelled</span>
+                  ) : (
+                    <span className={styles.completedText}>Completed</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

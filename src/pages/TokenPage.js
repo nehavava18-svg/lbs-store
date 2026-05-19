@@ -1,37 +1,36 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { cancelOrder } from '../services/api';
+import { cancelOrder } from '../services/firebaseApi';
 import TokenDisplay from '../components/TokenDisplay';
 import styles from './TokenPage.module.css';
 
 const TokenPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { token } = location.state || {};
+  // ✅ Expect both token (display) and orderId (Firestore doc id for cancel)
+  const { token, orderId } = location.state || {};
   const [isCancelling, setIsCancelling] = useState(false);
 
   if (!token) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/store" replace />;
   }
 
   const handleCancelOrder = async () => {
-    const confirmed = window.confirm('Are you sure you want to cancel this order?');
-    if (!confirmed) {
+    if (!orderId) {
+      alert('Cannot cancel: order ID missing.');
       return;
     }
+    const confirmed = window.confirm('Are you sure you want to cancel this order?');
+    if (!confirmed) return;
 
     setIsCancelling(true);
     try {
-      await cancelOrder(token);
+      await cancelOrder(orderId); // ✅ use Firestore doc id, not token string
       alert(`Order ${token} cancelled successfully.`);
       navigate('/status');
     } catch (error) {
       console.error('Error cancelling order:', error);
-      if (error.code === 'ORDER_NOT_CANCELLABLE') {
-        alert(`This order cannot be cancelled because it is ${error.status}.`);
-      } else {
-        alert('Failed to cancel order. Please try again.');
-      }
+      alert('Failed to cancel order. Please try again.');
     } finally {
       setIsCancelling(false);
     }
@@ -74,7 +73,7 @@ const TokenPage = () => {
             {isCancelling ? 'Cancelling...' : 'Cancel This Order'}
           </button>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/store')} // ✅ /store not /
             className={styles.secondaryButton}
           >
             Browse More Items
