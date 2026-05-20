@@ -111,7 +111,8 @@ const InventoryPage = () => {
     }
   };
 
-  const visiblePresets = pickerCat === "All"
+
+const visiblePresets = pickerCat === "All"
   ? PRESET_IMAGES
   : PRESET_IMAGES.filter((_, i) => {
       if (pickerCat === "Snacks")     return i < 16;
