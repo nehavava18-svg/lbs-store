@@ -111,9 +111,20 @@ const InventoryPage = () => {
     }
   };
 
-  const visiblePresets = pickerCat === "All"
-    ? PRESET_IMAGES
-    : PRESET_IMAGES.slice(...CATEGORY_RANGES[pickerCat]);
+  const CATEGORY_MAP = {
+  Snacks: "Snacks",
+  Stationery: "Stationery",
+  Print: "Print",
+};
+
+const visiblePresets = pickerCat === "All"
+  ? PRESET_IMAGES
+  : PRESET_IMAGES.filter((_, i) => {
+      if (pickerCat === "Snacks")     return i < 16;
+      if (pickerCat === "Stationery") return i >= 16 && i < 24;
+      if (pickerCat === "Print")      return i >= 24;
+      return true;
+    });
 
   return (
     <div className={styles.page}>
