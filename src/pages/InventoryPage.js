@@ -111,11 +111,6 @@ const InventoryPage = () => {
     }
   };
 
-  const CATEGORY_MAP = {
-  Snacks: "Snacks",
-  Stationery: "Stationery",
-  Print: "Print",
-};
 
 const visiblePresets = pickerCat === "All"
   ? PRESET_IMAGES
